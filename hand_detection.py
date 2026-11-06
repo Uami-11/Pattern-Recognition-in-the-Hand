@@ -51,3 +51,46 @@ while cap.isOpened():
 cap.release()
 hands.close()
 cv2.destroyAllWindows()
+
+def recognize_gesture(hand_landmarks):
+
+    landmarks = hand_landmarks.landmark
+
+    # Finger tip and PIP joint positions
+    fingers = [
+        (8, 6),    # Index
+        (12, 10), # Middle
+        (16, 14), # Ring
+        (20, 18)  # Pinky
+    ]
+
+    extended_fingers = 0
+
+    for tip, joint in fingers:
+
+        if landmarks[tip].y < landmarks[joint].y:
+            extended_fingers += 1
+
+    if extended_fingers == 4:
+        return "OPEN PALM"
+
+    elif extended_fingers == 0:
+        return "FIST"
+
+    elif extended_fingers == 2:
+        return "TWO FINGERS"
+
+    else:
+        return "UNKNOWN"
+
+gesture = recognize_gesture(hand_landmarks)
+
+cv2.putText(
+    frame,
+    gesture,
+    (50, 50),
+    cv2.FONT_HERSHEY_SIMPLEX,
+    1,
+    (0, 255, 0),
+    2
+)
