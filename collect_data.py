@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import time
 
-# MediaPipe initialization
+# MediaPipe setup
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
 
@@ -17,9 +17,9 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.7
 )
 
-# Dataset configuration
+# Configuration
 DATASET_PATH = "dataset/gestures.csv"
-os.makedirs("dataset", exist_ok=True)
+SAMPLES_PER_GESTURE = 200
 
 GESTURES = [
     "OPEN_PALM",
@@ -30,27 +30,27 @@ GESTURES = [
     "THREE_FINGERS"
 ]
 
-SAMPLES_PER_GESTURE = 200
+os.makedirs("dataset", exist_ok=True)
 
 # Select gesture
-print("\nAvailable gestures:")
+print("\nSelect a gesture:")
 
-for i, gesture in enumerate(GESTURES):
-    print(f"{i + 1}. {gesture}")
+for i, gesture in enumerate(GESTURES, 1):
+    print(f"{i}. {gesture}")
 
-choice = int(input("\nSelect gesture number: "))
+choice = int(input("Enter gesture number: "))
 
-if choice < 1 or choice > len(GESTURES):
-    raise ValueError("Invalid gesture selection")
+if not 1 <= choice <= len(GESTURES):
+    raise ValueError("Invalid gesture number")
 
 selected_gesture = GESTURES[choice - 1]
 
-print(f"\nSelected gesture: {selected_gesture}")
-print("Show your hand clearly in front of the camera.")
-print("Press SPACE to start collection.")
-print("Press Q to quit.")
+print(f"\nSelected: {selected_gesture}")
+print("Click on the webcam window.")
+print("Press SPACE to start collecting.")
+print("Press Q to stop.")
 
-# Extract and normalize landmarks
+# Feature extraction
 def extract_features(hand_landmarks):
 
     points = np.array([
@@ -58,10 +58,9 @@ def extract_features(hand_landmarks):
         for lm in hand_landmarks.landmark
     ], dtype=np.float32)
 
-    # Wrist as origin
-    points = points - points[0]
+    # Normalize relative to wrist
+    points -= points[0]
 
-    # Normalize hand size
     scale = np.max(
         np.linalg.norm(points[:, :2], axis=1)
     )
@@ -69,34 +68,33 @@ def extract_features(hand_landmarks):
     if scale < 1e-6:
         return None
 
-    points = points / scale
+    points /= scale
 
     return points.flatten()
 
 
-# Open webcam
-cap = cv2.VideoCapture(0)
+# Start webcam
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 if not cap.isOpened():
-    raise RuntimeError("Could not open webcam")
+    raise RuntimeError("Cannot access webcam")
 
-new_samples = []
+samples = []
 recording = False
 last_capture = 0
 
 try:
-    while cap.isOpened():
+    while True:
 
         success, frame = cap.read()
 
         if not success:
-            print("Could not read webcam frame.")
+            print("Camera frame could not be read.")
             break
 
         frame = cv2.flip(frame, 1)
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
         results = hands.process(rgb)
 
         hand_detected = False
@@ -113,11 +111,12 @@ try:
                     mp_hands.HAND_CONNECTIONS
                 )
 
-                if recording and len(new_samples) < SAMPLES_PER_GESTURE:
+                # Collect samples
+                if recording and len(samples) < SAMPLES_PER_GESTURE:
 
-                    current_time = time.time()
+                    now = time.time()
 
-                    if current_time - last_capture >= 0.1:
+                    if now - last_capture >= 0.1:
 
                         features = extract_features(hand_landmarks)
 
@@ -127,11 +126,16 @@ try:
                                 selected_gesture
                             ]
 
-                            new_samples.append(row)
+                            samples.append(row)
+                            last_capture = now
 
-                            last_capture = current_time
+                            # Print every 10 samples
+                            if len(samples) % 10 == 0:
+                                print(
+                                    f"Collected: {len(samples)}/{SAMPLES_PER_GESTURE}"
+                                )
 
-        # Display information
+        # Display status
         status = "RECORDING" if recording else "READY"
 
         detection = (
@@ -172,7 +176,7 @@ try:
 
         cv2.putText(
             frame,
-            f"Samples: {len(new_samples)}/{SAMPLES_PER_GESTURE}",
+            f"Samples: {len(samples)}/{SAMPLES_PER_GESTURE}",
             (20, 160),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
@@ -182,19 +186,20 @@ try:
 
         cv2.imshow("Gesture Data Collection", frame)
 
+        # Keyboard handling
         key = cv2.waitKey(1) & 0xFF
 
-        if key == ord(' '):
-            if hand_detected:
+        if key == 32:  # SPACEBAR
+
+            if not recording:
                 recording = True
-                print("Recording started...")
-            else:
-                print("Show your hand before starting.")
+                print("\nRECORDING STARTED!")
 
         elif key == ord('q'):
+            print("\nStopping collection...")
             break
 
-        if len(new_samples) >= SAMPLES_PER_GESTURE:
+        if len(samples) >= SAMPLES_PER_GESTURE:
             print("\nCollection completed!")
             break
 
@@ -204,18 +209,15 @@ finally:
     cv2.destroyAllWindows()
 
 
-# Save only newly collected samples
-if new_samples:
+# Save collected data
+if samples:
 
     columns = (
         [f"feature_{i}" for i in range(63)]
         + ["label"]
     )
 
-    new_df = pd.DataFrame(
-        new_samples,
-        columns=columns
-    )
+    new_df = pd.DataFrame(samples, columns=columns)
 
     file_has_data = (
         os.path.exists(DATASET_PATH)
@@ -229,10 +231,11 @@ if new_samples:
         index=False
     )
 
-    print(f"\nSuccessfully saved {len(new_samples)} samples!")
-    print(f"Gesture: {selected_gesture}")
-    print(f"File: {DATASET_PATH}")
+    print("\nSuccessfully saved samples!")
+    print("Gesture:", selected_gesture)
+    print("Samples:", len(samples))
+    print("Dataset:", DATASET_PATH)
 
 else:
     print("\nNo samples collected.")
-    print("Make sure your hand is visible to the webcam.")
+    print("Check webcam detection and keyboard input.")
