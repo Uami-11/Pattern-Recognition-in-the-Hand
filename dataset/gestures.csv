@@ -1,0 +1,4 @@
+feature_0,feature_1,feature_2,...,feature_62,label
+0.12,0.34,-0.02,...,0.45,OPEN_PALM
+0.15,0.30,-0.01,...,0.42,OPEN_PALM
+0.11,0.32,-0.03,...,0.40,OPEN_PALM
