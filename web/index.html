@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hand Gesture Recognition</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%96%90%EF%B8%8F%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Pattern recognition</p>
+          <h1>Hand Gesture Recognition</h1>
+        </div>
+        <div class="status" id="status" data-tone="idle">
+          <span class="status-dot"></span>
+          <span id="statusText">Loading model…</span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted hidden></video>
+          <canvas
+            id="scene"
+            width="1280"
+            height="720"
+            aria-label="Mirrored webcam with hand landmarks"
+          ></canvas>
+
+          <div class="stage-empty" id="stageEmpty">
+            <div class="stage-empty-card">
+              <h2>Show your hand to the camera</h2>
+              <p>
+                Recognises <strong>open palm</strong>, <strong>fist</strong>,
+                <strong>thumbs up</strong>, <strong>peace</strong>,
+                <strong>pointing</strong> and <strong>three fingers</strong>.
+              </p>
+              <button class="primary" id="startButton" type="button" disabled>
+                Enable camera
+              </button>
+              <p class="tiny" id="startHint">Preparing the model…</p>
+            </div>
+          </div>
+
+          <div class="live-badge" id="liveBadge" hidden>Live</div>
+        </div>
+
+        <aside class="readout" aria-live="polite">
+          <p class="readout-label">Detected gesture</p>
+          <p class="gesture" id="gesture">—</p>
+
+          <div class="confidence">
+            <div class="confidence-head">
+              <span>Confidence</span>
+              <span id="confidenceValue">0%</span>
+            </div>
+            <div class="confidence-track">
+              <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+          </div>
+
+          <div class="history" id="history" aria-label="Recent predictions"></div>
+
+          <p class="hint" id="hint">
+            Hold a gesture steady. The result is smoothed over the last 10
+            frames.
+          </p>
+
+          <dl class="facts">
+            <div><dt>Model</dt><dd>Random forest</dd></div>
+            <div><dt>Trees</dt><dd id="factTrees">—</dd></div>
+            <div><dt>Landmarks</dt><dd>21</dd></div>
+            <div><dt>Features</dt><dd>63</dd></div>
+          </dl>
+        </aside>
+      </section>
+
+      <footer>
+        Camera frames stay in this browser tab. Nothing is uploaded.
+      </footer>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

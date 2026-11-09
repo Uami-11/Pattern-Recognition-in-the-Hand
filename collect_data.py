@@ -74,7 +74,7 @@ def extract_features(hand_landmarks):
 
 
 # Start webcam
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     raise RuntimeError("Cannot access webcam")
