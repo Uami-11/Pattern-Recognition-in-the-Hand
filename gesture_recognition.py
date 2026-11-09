@@ -23,11 +23,10 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.7
 )
 
-# Store recent predictions for smoother results
+# Store recent predictions
 prediction_history = deque(maxlen=10)
 
 def extract_features(hand_landmarks):
-
     points = np.array([
         [lm.x, lm.y, lm.z]
         for lm in hand_landmarks.landmark
@@ -47,24 +46,43 @@ def extract_features(hand_landmarks):
     return points.flatten().reshape(1, -1)
 
 
+# Initialize sound system
+pygame.mixer.init()
+
+SOUND_FILES = {
+    "OPEN_PALM": "sounds/open_palm.wav",
+    "FIST": "sounds/fist.wav",
+    "THUMBS_UP": "sounds/thumbs_up.wav",
+    "PEACE": "sounds/peace.wav",
+    "POINTING": "sounds/pointing.wav",
+    "THREE_FINGERS": "sounds/three_fingers.wav"
+}
+
+sounds = {}
+
+for gesture_name, file_path in SOUND_FILES.items():
+    if os.path.exists(file_path):
+        sounds[gesture_name] = pygame.mixer.Sound(file_path)
+        print(f"Loaded sound: {gesture_name}")
+    else:
+        print(f"Sound file not found: {file_path}")
+
+# Sound trigger variables
+last_gesture = None
+last_sound_time = 0
+sound_cooldown = 1.0
+
 # Open webcam
 cap = cv2.VideoCapture(0)
 
-if not cap.isOpened():
-    raise RuntimeError("Could not open webcam")
-
-print("Hand Gesture Recognition Started")
-print("Press Q to exit.")
-
 while cap.isOpened():
 
-    success, frame = cap.read()
+    ret, frame = cap.read()
 
-    if not success:
+    if not ret:
         break
 
     frame = cv2.flip(frame, 1)
-
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     results = hands.process(rgb)
@@ -89,11 +107,9 @@ while cap.isOpened():
 
                 # Predict gesture
                 probabilities = model.predict_proba(features)[0]
-
                 best_index = np.argmax(probabilities)
 
                 predicted_gesture = model.classes_[best_index]
-
                 confidence = probabilities[best_index]
 
                 # Accept predictions with sufficient confidence
@@ -108,8 +124,24 @@ while cap.isOpened():
                         prediction_history
                     ).most_common(1)[0][0]
 
+                # Play sound when a new stable gesture is recognized
+                current_time = time.time()
+
+                if gesture != last_gesture:
+
+                    if (
+                        gesture in sounds
+                        and current_time - last_sound_time >= sound_cooldown
+                    ):
+                        sounds[gesture].play()
+                        last_sound_time = current_time
+
+                    last_gesture = gesture
+
     else:
         prediction_history.clear()
+        gesture = "NO HAND DETECTED"
+        last_gesture = None
 
     # Display gesture
     cv2.rectangle(
@@ -148,28 +180,10 @@ while cap.isOpened():
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-
+# Close resources
 cap.release()
 hands.close()
 cv2.destroyAllWindows()
+pygame.mixer.quit()
 
 print("Application closed.")
-
-pygame.mixer.init()
-
-SOUND_FILES = {
-    "OPEN_PALM": "sounds/open_palm.wav",
-    "FIST": "sounds/fist.wav",
-    "THUMBS_UP": "sounds/thumbs_up.wav",
-    "PEACE": "sounds/peace.wav",
-    "POINTING": "sounds/pointing.wav",
-    "THREE_FINGERS": "sounds/three_fingers.wav"
-}
-
-sounds = {}
-
-for gesture, file_path in SOUND_FILES.items():
-    if os.path.exists(file_path):
-        sounds[gesture] = pygame.mixer.Sound(file_path)
-    else:
-        print(f"Sound file not found: {file_path}")
