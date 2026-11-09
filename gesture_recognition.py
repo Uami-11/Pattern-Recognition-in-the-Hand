@@ -4,6 +4,9 @@ import mediapipe as mp
 import numpy as np
 import joblib
 from collections import deque, Counter
+import pygame
+import os
+import time
 
 # Load trained model
 saved_data = joblib.load("models/gesture_model.pkl")
@@ -151,3 +154,22 @@ hands.close()
 cv2.destroyAllWindows()
 
 print("Application closed.")
+
+pygame.mixer.init()
+
+SOUND_FILES = {
+    "OPEN_PALM": "sounds/open_palm.wav",
+    "FIST": "sounds/fist.wav",
+    "THUMBS_UP": "sounds/thumbs_up.wav",
+    "PEACE": "sounds/peace.wav",
+    "POINTING": "sounds/pointing.wav",
+    "THREE_FINGERS": "sounds/three_fingers.wav"
+}
+
+sounds = {}
+
+for gesture, file_path in SOUND_FILES.items():
+    if os.path.exists(file_path):
+        sounds[gesture] = pygame.mixer.Sound(file_path)
+    else:
+        print(f"Sound file not found: {file_path}")
