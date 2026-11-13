@@ -10,6 +10,17 @@ const HAND_MODEL_URL =
 
 const CONFIDENCE_THRESHOLD = 0.65;
 const HISTORY_LENGTH = 10;
+const SOUND_COOLDOWN_MS = 1000;
+const DEFAULT_VOLUME = 0.8;
+
+const SOUND_FILES = {
+  OPEN_PALM: "../sounds/open_palm.wav",
+  FIST: "../sounds/fist.wav",
+  THUMBS_UP: "../sounds/thumbs_up.wav",
+  PEACE: "../sounds/peace.wav",
+  POINTING: "../sounds/pointing.wav",
+  THREE_FINGERS: "../sounds/three_fingers.wav",
+};
 
 const GESTURE_LABELS = {
   FIST: "Fist",
@@ -62,6 +73,10 @@ const confidenceFill = document.querySelector("#confidenceFill");
 const historyElement = document.querySelector("#history");
 const hintElement = document.querySelector("#hint");
 const factTrees = document.querySelector("#factTrees");
+const soundToggle = document.querySelector("#soundToggle");
+const soundIcon = document.querySelector("#soundIcon");
+const soundToggleText = document.querySelector("#soundToggleText");
+const volumeRange = document.querySelector("#volume");
 
 let handLandmarker = null;
 let gestureModel = null;
@@ -71,7 +86,15 @@ let lastTimestamp = 0;
 let currentClass = null;
 let currentConfidence = 0;
 
+let audioContext = null;
+let soundGain = null;
+let soundMuted = false;
+let volume = DEFAULT_VOLUME;
+let lastSoundGesture = null;
+let lastSoundTime = 0;
+
 const history = [];
+const soundBuffers = new Map();
 
 function setStatus(message, tone = "idle") {
   statusText.textContent = message;
@@ -94,6 +117,111 @@ async function loadMediaPipe() {
   const module = await import(TASKS_VISION_MODULE);
   FilesetResolver = module.FilesetResolver;
   HandLandmarker = module.HandLandmarker;
+}
+
+async function setupAudio() {
+  const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;
+
+  if (audioContext) {
+    return;
+  }
+
+  if (!AudioContextClass) {
+    console.warn("Web Audio is unavailable; gesture sounds are disabled.");
+    return;
+  }
+
+  try {
+    audioContext = new AudioContextClass();
+    soundGain = audioContext.createGain();
+    soundGain.gain.value = volume;
+    soundGain.connect(audioContext.destination);
+
+    await Promise.all(
+      Object.entries(SOUND_FILES).map(async ([gesture, path]) => {
+        try {
+          const response = await fetch(path);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const buffer = await audioContext.decodeAudioData(
+            await response.arrayBuffer(),
+          );
+          soundBuffers.set(gesture, buffer);
+        } catch (error) {
+          console.warn(`Sound file not found: ${path}`, error);
+        }
+      }),
+    );
+  } catch (error) {
+    console.warn(
+      "Could not initialise audio; gesture sounds are disabled.",
+      error,
+    );
+  }
+}
+
+// Browsers keep the audio context suspended until a user gesture, so resume it
+// from the camera/toggle buttons before any sound needs to play.
+function unlockAudio() {
+  if (audioContext?.state === "suspended") {
+    audioContext.resume().catch((error) => {
+      console.warn("Could not start audio.", error);
+    });
+  }
+}
+
+function playGestureSound(gesture) {
+  const buffer = soundBuffers.get(gesture);
+
+  if (!buffer || !audioContext || !soundGain || soundMuted) {
+    return;
+  }
+
+  unlockAudio();
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(soundGain);
+  source.start();
+}
+
+function maybePlaySound(gesture) {
+  if (gesture === lastSoundGesture) {
+    return;
+  }
+
+  // Remember every change, even when muted, so unmuting does not replay the
+  // gesture that is already being held.
+  lastSoundGesture = gesture;
+
+  if (soundMuted || !soundBuffers.has(gesture)) {
+    return;
+  }
+
+  const now = performance.now();
+  if (now - lastSoundTime < SOUND_COOLDOWN_MS) {
+    return;
+  }
+
+  playGestureSound(gesture);
+  lastSoundTime = now;
+}
+
+function setMuted(muted) {
+  soundMuted = muted;
+  soundToggle.setAttribute("aria-pressed", String(!muted));
+  soundToggle.setAttribute(
+    "aria-label",
+    muted ? "Unmute gesture sounds" : "Mute gesture sounds",
+  );
+  soundToggleText.textContent = muted ? "Muted" : "On";
+  soundIcon.textContent = muted ? "🔇" : "🔊";
+  volumeRange.disabled = muted;
+
+  if (soundGain) {
+    soundGain.gain.value = muted ? 0 : volume;
+  }
 }
 
 async function createHandLandmarker() {
@@ -123,7 +251,11 @@ async function createHandLandmarker() {
 async function initialise() {
   try {
     setStatus("Loading model…", "idle");
-    const [model] = await Promise.all([loadGestureModel(), loadMediaPipe()]);
+    const [model] = await Promise.all([
+      loadGestureModel(),
+      loadMediaPipe(),
+      setupAudio(),
+    ]);
 
     gestureModel = model;
     setStatus("Starting tracker…", "idle");
@@ -245,6 +377,7 @@ function handleDetection(result) {
     history.length = 0;
     currentClass = null;
     currentConfidence = 0;
+    lastSoundGesture = null;
     renderReadout("NO_HAND");
     setStatus("No hand detected", "warning");
     return;
@@ -257,6 +390,7 @@ function handleDetection(result) {
     history.length = 0;
     currentClass = null;
     currentConfidence = 0;
+    lastSoundGesture = null;
     renderReadout("NO_HAND");
     return;
   }
@@ -274,6 +408,7 @@ function handleDetection(result) {
   currentClass = mostCommon(history);
   currentConfidence = confidence;
 
+  maybePlaySound(currentClass);
   renderReadout(currentClass);
   setStatus("Tracking hand", "tracking");
 }
@@ -442,7 +577,21 @@ function drawLandmarks(landmarks) {
   context.restore();
 }
 
+soundToggle.addEventListener("click", () => {
+  unlockAudio();
+  setMuted(!soundMuted);
+});
+
+volumeRange.addEventListener("input", () => {
+  volume = Number(volumeRange.value) / 100;
+  if (!soundMuted && soundGain) {
+    soundGain.gain.value = volume;
+  }
+});
+
 startButton.addEventListener("click", () => {
+  unlockAudio();
+
   if (!gestureModel || !handLandmarker) {
     initialise();
     return;

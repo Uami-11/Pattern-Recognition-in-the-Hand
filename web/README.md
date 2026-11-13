@@ -14,6 +14,9 @@ MediaPipe finds the 21 hand landmarks in the browser. The trained Random
 Forest from `models/gesture_model.pkl` is exported to JSON and evaluated in
 JavaScript, so no video frames or predictions leave the machine.
 
+Like the desktop app, a sound plays when a new gesture is recognised. The
+**Sound** row in the readout can mute playback or change the volume.
+
 ## Run it
 
 ```bash
@@ -26,9 +29,11 @@ uv run python -m http.server 8000
 
 Open <http://localhost:8000/web/> and click **Enable camera**.
 
-Camera access requires `localhost` or an HTTPS page. Chrome or Edge is
-recommended. The first load downloads MediaPipe's WASM runtime and the hand
-landmarker model from their public CDNs, so it needs an internet connection.
+Serve the repository root as shown above so the WAV files in `sounds/` are
+available to the page. Camera access requires `localhost` or an HTTPS page.
+Chrome or Edge is recommended. The first load downloads MediaPipe's WASM
+runtime and the hand landmarker model from their public CDNs, so it needs an
+internet connection.
 
 ## Verify the JS model
 
@@ -50,6 +55,10 @@ checks that the class and probabilities match scikit-learn.
    averaged result is the prediction.
 5. Predictions below 65% confidence become `UNKNOWN`, and the last 10 frames
    are smoothed by majority vote.
+6. When the smoothed gesture changes, the matching WAV from `../sounds/` plays
+   once. Repeated gestures stay silent and a 1-second cooldown matches
+   `gesture_recognition.py`. The Sound control mutes audio or adjusts volume.
 
 If retraining changes the number of gestures or features, re-run
-`uv run export_model.py` and update `GESTURE_LABELS` in `web/app.js`.
+`uv run export_model.py` and update `GESTURE_LABELS` and `SOUND_FILES` in
+`web/app.js`.

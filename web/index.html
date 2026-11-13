@@ -67,6 +67,31 @@
 
           <div class="history" id="history" aria-label="Recent predictions"></div>
 
+          <div class="sound">
+            <div class="sound-head">
+              <span>Sound</span>
+              <button
+                class="sound-toggle"
+                id="soundToggle"
+                type="button"
+                aria-pressed="true"
+                aria-label="Mute gesture sounds"
+              >
+                <span id="soundIcon" aria-hidden="true">🔊</span>
+                <span id="soundToggleText">On</span>
+              </button>
+            </div>
+            <input
+              class="sound-range"
+              id="volume"
+              type="range"
+              min="0"
+              max="100"
+              value="80"
+              aria-label="Sound volume"
+            />
+          </div>
+
           <p class="hint" id="hint">
             Hold a gesture steady. The result is smoothed over the last 10
             frames.
