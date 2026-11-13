@@ -1,0 +1,8 @@
+# Keep the upload small. The static build only needs web/ and sounds/.
+.venv/
+.venv311/
+__pycache__/
+dataset/
+models/
+*.pyc
+*.pyo

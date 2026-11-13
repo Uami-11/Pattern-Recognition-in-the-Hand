@@ -11,6 +11,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+.vercel/
 downloads/
 eggs/
 .eggs/
@@ -218,3 +219,4 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.vercel
